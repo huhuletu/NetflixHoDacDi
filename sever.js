@@ -15,7 +15,7 @@ const db = {
     display_seconds: 15 
   },
   config: {
-    tgGateEnabled: true, // Bật tính năng bắt buộc tham gia Telegram
+    tgGateEnabled: false, // Bật tính năng bắt buộc tham gia Telegram
     tgChannels: [
       { label: "Kênh Chính Thức", url: "https://t.me/your_channel" },
       { label: "Nhóm Chat", url: "https://t.me/your_group" }
