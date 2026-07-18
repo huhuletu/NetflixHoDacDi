@@ -1,114 +1,116 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <title>Bảng Điều Khiển Admin</title>
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; padding: 30px; display: flex; gap: 20px; flex-wrap: wrap;}
-    .card { background: #1e1e1e; padding: 20px; border-radius: 10px; width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    h3 { color: #e50914; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
-    input, select { width: 100%; padding: 12px; margin-bottom: 15px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; }
-    input[type="file"] { padding: 10px; border: 1px dashed #555; background: transparent; }
-    button { padding: 12px 20px; background: #e50914; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
-    button:hover { background: #ff1f2d; }
-    pre { background: #000; padding: 15px; border-radius: 6px; overflow-x: auto; color: #2ecc71; font-size: 13px; }
-    .status { margin-top: 10px; color: #2ecc71; font-weight: bold; text-align: center; display: none; }
-  </style>
-</head>
-<body>
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
 
-  <!-- 1. PANEL GỬI THÔNG BÁO -->
-  <div class="card">
-    <h3>📢 Gửi Thông Báo</h3>
-    <input type="text" id="msgInput" placeholder="Ví dụ: Đã update cookie Premium!">
-    <button onclick="sendNotification()">Phát Thông Báo</button>
-    <div id="statusNotif" class="status">Đã gửi thành công!</div>
-  </div>
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-  <!-- 2. PANEL TẢI FILE COOKIE LÊN -->
-  <div class="card">
-    <h3>📁 Upload File Cookie</h3>
-    <select id="planSelect">
-      <option value="premium">Gói Premium</option>
-      <option value="standard">Gói Standard</option>
-      <option value="duplicate">Gói Duplicate</option>
-      <option value="basic">Gói Basic</option>
-    </select>
-    <input type="file" id="fileInput" accept=".txt,.json">
-    <button onclick="uploadCookieFile()" style="background: #2ecc71; color: black; margin-top: 10px;">Tải File Lên Hệ Thống</button>
-    <div id="statusUpload" class="status">Đã cập nhật file!</div>
-  </div>
+// Cấu hình lưu file upload vào bộ nhớ RAM
+const upload = multer({ storage: multer.memoryStorage() });
 
-  <!-- 3. PANEL KIỂM TRA LƯỢT DÙNG CỦA KHÁCH -->
-  <div class="card" style="width: 100%;">
-    <h3>👥 Thiết Bị & Lượt Kết Nối</h3>
-    <button onclick="fetchUsers()" style="background: #2980b9; margin-bottom: 15px; width: auto;">Làm Mới Danh Sách</button>
-    <pre id="userList">Bấm làm mới để tải dữ liệu...</pre>
-  </div>
+// CƠ SỞ DỮ LIỆU TẠM THỜI
+const db = {
+  notification: { id: 1, message: "Hệ thống đã sẵn sàng!", display_seconds: 15 },
+  config: { tgGateEnabled: false, tgChannels: [], tgBotUsername: "" },
+  plansConfig: {
+    premium: { limit: 2, windowMinutes: 720, url: "https://netflix.com/browse", cookie_value: "" },
+    standard: { limit: 2, windowMinutes: 720, url: "https://netflix.com/browse", cookie_value: "" },
+    duplicate: { limit: 2, windowMinutes: 720, url: "https://netflix.com/browse", cookie_value: "" },
+    basic: { limit: 2, windowMinutes: 720, url: "https://netflix.com/browse", cookie_value: "" }
+  },
+  users: new Map()
+};
 
-  <script>
-    // BẠN HÃY ĐIỀN ĐƯỜNG LINK RENDER CỦA BẠN VÀO ĐÂY NHÉ:
-    const API_URL = "https://netflixhodacdi.onrender.com"; 
+function getUser(uuid) {
+  if (!uuid) return null;
+  if (!db.users.has(uuid)) {
+    db.users.set(uuid, {
+      tgVerified: true,
+      history: { premium: [], standard: [], duplicate: [], basic: [] },
+      bonus: { premium: 0, standard: 0, duplicate: 0, basic: 0 }
+    });
+  }
+  return db.users.get(uuid);
+}
 
-    // Gửi thông báo
-    async function sendNotification() {
-      const msg = document.getElementById('msgInput').value;
-      if (!msg) return alert("Vui lòng nhập nội dung!");
-      try {
-        const res = await fetch(`${API_URL}/admin/push-notification`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msg })
-        });
-        if (res.ok) {
-          const st = document.getElementById('statusNotif');
-          st.style.display = 'block';
-          setTimeout(() => st.style.display = 'none', 3000);
-          document.getElementById('msgInput').value = '';
-        }
-      } catch (err) { alert("Lỗi: " + err); }
-    }
+function calculateUsage(user) {
+  const now = Date.now();
+  const usageArray = [];
+  for (const [planId, planObj] of Object.entries(db.plansConfig)) {
+    const history = user.history[planId] || [];
+    const windowMs = planObj.windowMinutes * 60 * 1000;
+    const validHistory = history.filter(time => now - time < windowMs);
+    user.history[planId] = validHistory; 
+    const used = validHistory.length;
+    const totalLimit = planObj.limit + (user.bonus[planId] || 0);
+    usageArray.push({
+      id: planId,
+      name: planId.charAt(0).toUpperCase() + planId.slice(1),
+      used: used,
+      limit: planObj.limit,
+      bonus: user.bonus[planId] || 0,
+      windowMinutes: planObj.windowMinutes,
+      resetMinutes: used > 0 ? Math.max(0, Math.ceil((windowMs - (now - Math.min(...validHistory))) / 60000)) : 0,
+      unlimited: false
+    });
+  }
+  return usageArray;
+}
 
-    // Tải file Cookie
-    async function uploadCookieFile() {
-      const fileInput = document.getElementById('fileInput');
-      const plan = document.getElementById('planSelect').value;
+// --- GIAO DIỆN ADMIN (TRANG CHỦ) ---
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
 
-      if (fileInput.files.length === 0) return alert("Bạn chưa chọn file nào!");
+// --- API EXTENSION ---
+app.get('/api/config', (req, res) => res.json({ ...db.config, tgVerified: true }));
+app.get('/api/notification', (req, res) => res.json({ notification: db.notification }));
+app.post('/api/tg-claim', (req, res) => res.json({ ok: true }));
 
-      const formData = new FormData();
-      formData.append("cookieFile", fileInput.files[0]);
-      formData.append("plan", plan);
+app.get('/api/usage', (req, res) => {
+  const user = getUser(req.headers['x-client-uuid']);
+  res.json(user ? calculateUsage(user) : []);
+});
 
-      try {
-        const res = await fetch(`${API_URL}/admin/upload-cookie`, {
-          method: 'POST',
-          body: formData
-        });
-        const result = await res.json();
-        
-        if (res.ok) {
-          const st = document.getElementById('statusUpload');
-          st.innerText = result.message;
-          st.style.display = 'block';
-          setTimeout(() => st.style.display = 'none', 3000);
-          fileInput.value = ''; // Xóa trắng ô
-        } else {
-          alert("Lỗi: " + result.error);
-        }
-      } catch (err) { alert("Lỗi tải file: " + err); }
-    }
+app.post('/api/connect', (req, res) => {
+  const uuid = req.headers['x-client-uuid'];
+  const { plan } = req.body;
+  const user = getUser(uuid);
+  const planObj = db.plansConfig[plan];
+  if (!user || !planObj) return res.status(400).json({ error: "Lỗi!" });
 
-    // Xem thiết bị đang dùng
-    async function fetchUsers() {
-      const display = document.getElementById('userList');
-      display.innerText = "Đang tải dữ liệu...";
-      try {
-        const res = await fetch(`${API_URL}/admin/users`);
-        const data = await res.json();
-        display.innerText = JSON.stringify(data, null, 2);
-      } catch (err) { display.innerText = "Lỗi kết nối: " + err; }
-    }
-  </script>
-</body>
-</html>
+  const usageData = calculateUsage(user);
+  const planUsage = usageData.find(u => u.id === plan);
+  if (planUsage.used >= (planUsage.limit + planUsage.bonus)) return res.status(403).json({ error: "Hết lượt!" });
+
+  user.history[plan].push(Date.now());
+  res.json({ success: true, url: planObj.url, cookie_value: planObj.cookie_value, remaining: (planUsage.limit + planUsage.bonus) - planUsage.used - 1 });
+});
+
+// --- API ADMIN ---
+app.post('/admin/push-notification', (req, res) => {
+  db.notification.id += 1;
+  db.notification.message = req.body.message;
+  res.json({ success: true });
+});
+
+app.get('/admin/users', (req, res) => {
+  const allUsers = {};
+  for (const [uuid, data] of db.users.entries()) {
+    allUsers[uuid] = { historyCount: Object.keys(data.history).map(k => `${k}: ${data.history[k].length}`).join(', ') };
+  }
+  res.json(allUsers);
+});
+
+app.post('/admin/upload-cookie', upload.single('cookieFile'), (req, res) => {
+  const plan = req.body.plan;
+  if (req.file && db.plansConfig[plan]) {
+    db.plansConfig[plan].cookie_value = req.file.buffer.toString('utf-8');
+    res.json({ success: true, message: `Đã cập nhật ${plan.toUpperCase()}!` });
+  } else res.status(400).json({ error: "Lỗi upload!" });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Hệ thống đang chạy tại cổng ${PORT}`));
