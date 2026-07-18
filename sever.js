@@ -17,10 +17,10 @@ const db = {
   config: {
     tgGateEnabled: false, // Bật tính năng bắt buộc tham gia Telegram
     tgChannels: [
-      { label: "Kênh Chính Thức", url: "https://t.me/your_channel" },
-      { label: "Nhóm Chat", url: "https://t.me/your_group" }
+      { label: "Netflix By HodacDi" },
+      { label: "Full 4 Gói Netflix" }
     ],
-    tgBotUsername: "@your_verify_bot"
+    tgBotUsername: "HoDacDi"
   },
   plansConfig: {
     premium: { limit: 2, windowMinutes: 720, url: "https://netflix.com/browse?profile=premium" },
