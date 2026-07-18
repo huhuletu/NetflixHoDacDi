@@ -2,67 +2,107 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Nghien Flix - Admin Dashboard</title>
+  <title>Bảng Điều Khiển Admin</title>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; padding: 30px; }
-    h2 { color: #e50914; border-bottom: 1px solid #333; padding-bottom: 10px; }
-    .container { display: flex; gap: 20px; }
-    .card { background: #1e1e1e; padding: 20px; border-radius: 10px; width: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    input { width: 100%; padding: 12px; margin-bottom: 15px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; }
-    button { padding: 12px 20px; background: #e50914; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; padding: 30px; display: flex; gap: 20px; flex-wrap: wrap;}
+    .card { background: #1e1e1e; padding: 20px; border-radius: 10px; width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    h3 { color: #e50914; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
+    input, select { width: 100%; padding: 12px; margin-bottom: 15px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; }
+    input[type="file"] { padding: 10px; border: 1px dashed #555; background: transparent; }
+    button { padding: 12px 20px; background: #e50914; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
     button:hover { background: #ff1f2d; }
     pre { background: #000; padding: 15px; border-radius: 6px; overflow-x: auto; color: #2ecc71; font-size: 13px; }
-    .status { margin-top: 10px; color: #31d5ac; font-weight: bold; text-align: center; display: none; }
+    .status { margin-top: 10px; color: #2ecc71; font-weight: bold; text-align: center; display: none; }
   </style>
 </head>
 <body>
 
-  <h2>Bảng Điều Khiển Quản Trị Viên</h2>
-  
-  <div class="container">
-    <!-- PANEL GỬI THÔNG BÁO -->
-    <div class="card">
-      <h3>📢 Gửi Thông Báo (Push Notification)</h3>
-      <input type="text" id="msgInput" placeholder="Nhập nội dung: VD: Đã update cookie Premium!">
-      <button onclick="sendNotification()">Phát Thông Báo Ngay</button>
-      <div id="status" class="status">Đã gửi tới toàn bộ thiết bị!</div>
-    </div>
+  <!-- 1. PANEL GỬI THÔNG BÁO -->
+  <div class="card">
+    <h3>📢 Gửi Thông Báo</h3>
+    <input type="text" id="msgInput" placeholder="Ví dụ: Đã update cookie Premium!">
+    <button onclick="sendNotification()">Phát Thông Báo</button>
+    <div id="statusNotif" class="status">Đã gửi thành công!</div>
+  </div>
 
-    <!-- PANEL KIỂM TRA THIẾT BỊ -->
-    <div class="card">
-      <h3>👥 Quản lý Thiết bị (UID)</h3>
-      <button onclick="fetchUsers()" style="background: #2980b9; margin-bottom: 15px;">Làm Mới Danh Sách</button>
-      <pre id="userList">// Danh sách thiết bị và lượt kết nối sẽ hiển thị ở đây...</pre>
-    </div>
+  <!-- 2. PANEL TẢI FILE COOKIE LÊN -->
+  <div class="card">
+    <h3>📁 Upload File Cookie</h3>
+    <select id="planSelect">
+      <option value="premium">Gói Premium</option>
+      <option value="standard">Gói Standard</option>
+      <option value="duplicate">Gói Duplicate</option>
+      <option value="basic">Gói Basic</option>
+    </select>
+    <input type="file" id="fileInput" accept=".txt,.json">
+    <button onclick="uploadCookieFile()" style="background: #2ecc71; color: black; margin-top: 10px;">Tải File Lên Hệ Thống</button>
+    <div id="statusUpload" class="status">Đã cập nhật file!</div>
+  </div>
+
+  <!-- 3. PANEL KIỂM TRA LƯỢT DÙNG CỦA KHÁCH -->
+  <div class="card" style="width: 100%;">
+    <h3>👥 Thiết Bị & Lượt Kết Nối</h3>
+    <button onclick="fetchUsers()" style="background: #2980b9; margin-bottom: 15px; width: auto;">Làm Mới Danh Sách</button>
+    <pre id="userList">Bấm làm mới để tải dữ liệu...</pre>
   </div>
 
   <script>
-    // SAU KHI ĐƯA SERVER LÊN RENDER, HÃY DÁN LINK VÀO ĐÂY
-    const API_URL = "https://backend-cua-ban.onrender.com"; 
+    // BẠN HÃY ĐIỀN ĐƯỜNG LINK RENDER CỦA BẠN VÀO ĐÂY NHÉ:
+    const API_URL = "https://netflixhodacdi.onrender.com"; 
 
+    // Gửi thông báo
     async function sendNotification() {
       const msg = document.getElementById('msgInput').value;
-      if (!msg) return alert("Nhập nội dung đi sếp!");
-
+      if (!msg) return alert("Vui lòng nhập nội dung!");
       try {
         const res = await fetch(`${API_URL}/admin/push-notification`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: msg })
         });
-        
         if (res.ok) {
-          const st = document.getElementById('status');
+          const st = document.getElementById('statusNotif');
           st.style.display = 'block';
           setTimeout(() => st.style.display = 'none', 3000);
           document.getElementById('msgInput').value = '';
         }
-      } catch (err) { alert("Lỗi kết nối: " + err); }
+      } catch (err) { alert("Lỗi: " + err); }
     }
 
+    // Tải file Cookie
+    async function uploadCookieFile() {
+      const fileInput = document.getElementById('fileInput');
+      const plan = document.getElementById('planSelect').value;
+
+      if (fileInput.files.length === 0) return alert("Bạn chưa chọn file nào!");
+
+      const formData = new FormData();
+      formData.append("cookieFile", fileInput.files[0]);
+      formData.append("plan", plan);
+
+      try {
+        const res = await fetch(`${API_URL}/admin/upload-cookie`, {
+          method: 'POST',
+          body: formData
+        });
+        const result = await res.json();
+        
+        if (res.ok) {
+          const st = document.getElementById('statusUpload');
+          st.innerText = result.message;
+          st.style.display = 'block';
+          setTimeout(() => st.style.display = 'none', 3000);
+          fileInput.value = ''; // Xóa trắng ô
+        } else {
+          alert("Lỗi: " + result.error);
+        }
+      } catch (err) { alert("Lỗi tải file: " + err); }
+    }
+
+    // Xem thiết bị đang dùng
     async function fetchUsers() {
       const display = document.getElementById('userList');
-      display.innerText = "Đang tải...";
+      display.innerText = "Đang tải dữ liệu...";
       try {
         const res = await fetch(`${API_URL}/admin/users`);
         const data = await res.json();
