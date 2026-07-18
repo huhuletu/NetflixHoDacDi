@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Nghien Flix - Admin Dashboard</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; padding: 30px; }
+    h2 { color: #e50914; border-bottom: 1px solid #333; padding-bottom: 10px; }
+    .container { display: flex; gap: 20px; }
+    .card { background: #1e1e1e; padding: 20px; border-radius: 10px; width: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    input { width: 100%; padding: 12px; margin-bottom: 15px; background: #333; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; }
+    button { padding: 12px 20px; background: #e50914; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+    button:hover { background: #ff1f2d; }
+    pre { background: #000; padding: 15px; border-radius: 6px; overflow-x: auto; color: #2ecc71; font-size: 13px; }
+    .status { margin-top: 10px; color: #31d5ac; font-weight: bold; text-align: center; display: none; }
+  </style>
+</head>
+<body>
+
+  <h2>Bảng Điều Khiển Quản Trị Viên</h2>
+  
+  <div class="container">
+    <!-- PANEL GỬI THÔNG BÁO -->
+    <div class="card">
+      <h3>📢 Gửi Thông Báo (Push Notification)</h3>
+      <input type="text" id="msgInput" placeholder="Nhập nội dung: VD: Đã update cookie Premium!">
+      <button onclick="sendNotification()">Phát Thông Báo Ngay</button>
+      <div id="status" class="status">Đã gửi tới toàn bộ thiết bị!</div>
+    </div>
+
+    <!-- PANEL KIỂM TRA THIẾT BỊ -->
+    <div class="card">
+      <h3>👥 Quản lý Thiết bị (UID)</h3>
+      <button onclick="fetchUsers()" style="background: #2980b9; margin-bottom: 15px;">Làm Mới Danh Sách</button>
+      <pre id="userList">// Danh sách thiết bị và lượt kết nối sẽ hiển thị ở đây...</pre>
+    </div>
+  </div>
+
+  <script>
+    // SAU KHI ĐƯA SERVER LÊN RENDER, HÃY DÁN LINK VÀO ĐÂY
+    const API_URL = "https://backend-cua-ban.onrender.com"; 
+
+    async function sendNotification() {
+      const msg = document.getElementById('msgInput').value;
+      if (!msg) return alert("Nhập nội dung đi sếp!");
+
+      try {
+        const res = await fetch(`${API_URL}/admin/push-notification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+        
+        if (res.ok) {
+          const st = document.getElementById('status');
+          st.style.display = 'block';
+          setTimeout(() => st.style.display = 'none', 3000);
+          document.getElementById('msgInput').value = '';
+        }
+      } catch (err) { alert("Lỗi kết nối: " + err); }
+    }
+
+    async function fetchUsers() {
+      const display = document.getElementById('userList');
+      display.innerText = "Đang tải...";
+      try {
+        const res = await fetch(`${API_URL}/admin/users`);
+        const data = await res.json();
+        display.innerText = JSON.stringify(data, null, 2);
+      } catch (err) { display.innerText = "Lỗi kết nối: " + err; }
+    }
+  </script>
+</body>
+</html>
